@@ -66,6 +66,7 @@ import Model.KnowledgeModel.KnowledgeModel
 import Model.KnowledgeModelBundle.KnowledgeModelBundle
 import Model.Level.Level
 import Model.Migrator.MigratorState
+import Model.QuestionnaireMigrator.QuestionnaireMigratorState
 import Model.Organization.Organization
 import Model.Package.Package
 import Model.Questionnaire.Questionnaire
@@ -258,6 +259,9 @@ makeFields ''MigratorConflictDTO
 makeFields ''MigratorStateCreateDTO
 
 makeFields ''MigratorStateDTO
+
+-- Model / QuestionnaireMigrator
+makeFields ''QuestionnaireMigratorState
 
 -- Model / Organization
 makeFields ''Organization
