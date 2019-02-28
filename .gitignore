@@ -3,3 +3,8 @@ src.iml
 config/app-config.cfg
 config/app-config-test.cfg
 dsw-server.cabal
+
+# IDEA Stuff
+.idea
+dsw-server.iml
+out/
