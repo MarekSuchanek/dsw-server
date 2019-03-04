@@ -132,7 +132,8 @@ createEndpoints context
   post "/questionnaires/:qtnUuid/report/preview" postQuestionnaireReportPreviewA
   get "/questionnaires/:qtnUuid/report" getQuestionnaireReportA
   delete "/questionnaires/:qtnUuid" deleteQuestionnaireA
---  post "/questionnaires/:qtnUuid/migrations" postQuestionnaireMigrationsA
+  post "/questionnaires/:qtnUuid/migrations" postQuestionnaireMigrationsCurrentA
+  delete "/questionnaires/:qtnUuid/migrations" deleteQuestionnaireMigrationsCurrentA
    --------------------
    -- BOOK REFERENCE
    --------------------
