@@ -17,7 +17,7 @@ import Service.KnowledgeModel.KnowledgeModelApplicator (heCreateKnowledgeModel)
 import Service.Migrator.Applicator.Applicator
 
 -- Creates new knowledgemodel-like diff tree and diff events between
--- old knowledgemodel and new knowledgemodel.
+-- an old knowledgemodel and a new knowledgemodel.
 diffKnowledgeModelsById :: String -> String -> AppContextM (Either AppError KnowledgeModelDiff)
 diffKnowledgeModelsById oldKmId newKmId =
   -- TODO: Validate input data here
