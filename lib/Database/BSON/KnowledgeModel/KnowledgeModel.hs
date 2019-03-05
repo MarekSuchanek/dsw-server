@@ -81,6 +81,7 @@ instance ToBSON OptionsQuestion where
     , "text" BSON.=: (model ^. text)
     , "requiredLevel" BSON.=: (model ^. requiredLevel)
     , "tagUuids" BSON.=: serializeUUIDList (model ^. tagUuids)
+    , "note" BSON.=: (model ^. note)
     , "references" BSON.=: (model ^. references)
     , "experts" BSON.=: (model ^. experts)
     , "answers" BSON.=: (model ^. answers)
@@ -94,6 +95,7 @@ instance FromBSON OptionsQuestion where
     qText <- BSON.lookup "text" doc
     qRequiredLevel <- BSON.lookup "requiredLevel" doc
     qTagUuids <- deserializeMaybeUUIDList $ BSON.lookup "tagUuids" doc
+    qNote <- BSON.lookup "note" doc
     qReferences <- BSON.lookup "references" doc
     qExperts <- BSON.lookup "experts" doc
     qAnswers <- BSON.lookup "answers" doc
@@ -104,6 +106,7 @@ instance FromBSON OptionsQuestion where
       , _optionsQuestionText = qText
       , _optionsQuestionRequiredLevel = qRequiredLevel
       , _optionsQuestionTagUuids = qTagUuids
+      , _optionsQuestionNote = qNote
       , _optionsQuestionReferences = qReferences
       , _optionsQuestionExperts = qExperts
       , _optionsQuestionAnswers = qAnswers
@@ -118,6 +121,7 @@ instance ToBSON ListQuestion where
     , "text" BSON.=: (model ^. text)
     , "requiredLevel" BSON.=: (model ^. requiredLevel)
     , "tagUuids" BSON.=: serializeUUIDList (model ^. tagUuids)
+    , "note" BSON.=: (model ^. note)
     , "references" BSON.=: (model ^. references)
     , "experts" BSON.=: (model ^. experts)
     , "itemTemplateTitle" BSON.=: (model ^. itemTemplateTitle)
@@ -132,6 +136,7 @@ instance FromBSON ListQuestion where
     qText <- BSON.lookup "text" doc
     qRequiredLevel <- BSON.lookup "requiredLevel" doc
     qTagUuids <- deserializeMaybeUUIDList $ BSON.lookup "tagUuids" doc
+    qNote <- BSON.lookup "note" doc
     qReferences <- BSON.lookup "references" doc
     qExperts <- BSON.lookup "experts" doc
     qItemTemplateTitle <- BSON.lookup "itemTemplateTitle" doc
@@ -143,6 +148,7 @@ instance FromBSON ListQuestion where
       , _listQuestionText = qText
       , _listQuestionRequiredLevel = qRequiredLevel
       , _listQuestionTagUuids = qTagUuids
+      , _listQuestionNote = qNote
       , _listQuestionReferences = qReferences
       , _listQuestionExperts = qExperts
       , _listQuestionItemTemplateTitle = qItemTemplateTitle
@@ -158,6 +164,7 @@ instance ToBSON ValueQuestion where
     , "text" BSON.=: (model ^. text)
     , "requiredLevel" BSON.=: (model ^. requiredLevel)
     , "tagUuids" BSON.=: serializeUUIDList (model ^. tagUuids)
+    , "note" BSON.=: (model ^. note)
     , "references" BSON.=: (model ^. references)
     , "experts" BSON.=: (model ^. experts)
     , "valueType" BSON.=: serializeQuestionValueType (model ^. valueType)
@@ -171,6 +178,7 @@ instance FromBSON ValueQuestion where
     qText <- BSON.lookup "text" doc
     qRequiredLevel <- BSON.lookup "requiredLevel" doc
     qTagUuids <- deserializeMaybeUUIDList $ BSON.lookup "tagUuids" doc
+    qNote <- BSON.lookup "note" doc
     qReferences <- BSON.lookup "references" doc
     qExperts <- BSON.lookup "experts" doc
     qValueType <- deserializeQuestionValueType $ BSON.lookup "valueType" doc
@@ -181,6 +189,7 @@ instance FromBSON ValueQuestion where
       , _valueQuestionText = qText
       , _valueQuestionRequiredLevel = qRequiredLevel
       , _valueQuestionTagUuids = qTagUuids
+      , _valueQuestionNote = qNote
       , _valueQuestionReferences = qReferences
       , _valueQuestionExperts = qExperts
       , _valueQuestionValueType = qValueType
