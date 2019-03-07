@@ -91,7 +91,8 @@ getQuestionnaireDetailById qtnUuid =
   heFindQuestionnaireById qtnUuid $ \qtn ->
     checkPermissionToQtn qtn $ do
       heFindPackageWithEventsById (qtn ^. packageId) $ \package ->
-        return . Right $ toDetailWithPackageWithEventsDTO qtn package
+        -- TODO: Find current questionnaire state
+        return . Right $ toDetailWithPackageWithEventsDTO qtn package QSDefault
 
 modifyQuestionnaire :: String -> QuestionnaireChangeDTO -> AppContextM (Either AppError QuestionnaireDetailDTO)
 modifyQuestionnaire qtnUuid reqDto =
@@ -99,7 +100,8 @@ modifyQuestionnaire qtnUuid reqDto =
     now <- liftIO getCurrentTime
     let updatedQtn = fromChangeDTO qtnDto reqDto now
     updateQuestionnaireById updatedQtn
-    return . Right $ toDetailWithPackageDTO updatedQtn (qtnDto ^. package)
+    -- TODO: Find current questionnaire state
+    return . Right $ toDetailWithPackageDTO updatedQtn (qtnDto ^. package) QSDefault
 
 deleteQuestionnaire :: String -> AppContextM (Maybe AppError)
 deleteQuestionnaire qtnUuid =

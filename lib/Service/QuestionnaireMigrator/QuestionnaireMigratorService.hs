@@ -6,6 +6,7 @@ import LensesConfig
 import Model.Error.Error
 import Model.Context.AppContext
 import Model.QuestionnaireMigrator.QuestionnaireMigratorState
+import Model.Questionnaire.QuestionnaireState
 import Api.Resource.QuestionnaireMigrator.QuestionnaireMigratorStateCreateDTO
 import Api.Resource.QuestionnaireMigrator.QuestionnaireMigratorStateDTO
 import Database.DAO.QuestionnaireMigrator.QuestionnaireMigratorDAO
@@ -29,7 +30,8 @@ createQuestionnaireMigration qId qDto =
                 , _questionnaireMigratorStateDiffEvents = kmDiff ^. events
                 }
         createQuestionnaireMigratorState state
-        return . Right $ QM.toDTO state package
+        -- TODO: Find current questionnaire state and remove import
+        return . Right $ QM.toDTO state package QSDefault
 
 -- Creates backup for old questionnaire and moves migrated questionnaire to its place.
 finishQuestionnaireMigration :: String -> Either AppError QuestionnaireMigratorStateDTO
@@ -39,7 +41,8 @@ finishQuestionnaireMigration = undefined
 getQuestionnaireMigration :: String -> AppContextM (Either AppError QuestionnaireMigratorStateDTO)
 getQuestionnaireMigration qtnUuid = heFindQuestionnaireMigratorStateByQuestionnaireId qtnUuid $ \state ->
   heFindPackageById (state ^. targetPackageId) $ \package ->
-    return . Right $ QM.toDTO state package
+    -- TODO: Find current questionnaire state and remove import
+    return . Right $ QM.toDTO state package QSDefault
 
 -- Cancels questionnaire migration for given uuid.
 cancelQuestionnaireMigration :: String -> AppContextM (Maybe AppError)

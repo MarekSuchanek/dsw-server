@@ -72,13 +72,14 @@ toFairsharingIntegrationReplyDTO FairsharingIntegrationReply {..} =
   , _fairsharingIntegrationReplyDTOName = _fairsharingIntegrationReplyName
   }
 
-toDetailWithPackageWithEventsDTO :: Questionnaire -> PackageWithEvents -> QuestionnaireDetailDTO
-toDetailWithPackageWithEventsDTO questionnaire package =
+toDetailWithPackageWithEventsDTO :: Questionnaire -> PackageWithEvents -> QuestionnaireState -> QuestionnaireDetailDTO
+toDetailWithPackageWithEventsDTO questionnaire package state =
   QuestionnaireDetailDTO
   { _questionnaireDetailDTOUuid = questionnaire ^. uuid
   , _questionnaireDetailDTOName = questionnaire ^. name
   , _questionnaireDetailDTOLevel = questionnaire ^. level
   , _questionnaireDetailDTOPrivate = questionnaire ^. private
+  , _questionnaireDetailDTOState = toStateDTO state
   , _questionnaireDetailDTOPackage = packageWithEventsToDTO package
   , _questionnaireDetailDTOSelectedTagUuids = questionnaire ^. selectedTagUuids
   , _questionnaireDetailDTOKnowledgeModel = toKnowledgeModelDTO $ questionnaire ^. knowledgeModel
@@ -88,13 +89,14 @@ toDetailWithPackageWithEventsDTO questionnaire package =
   , _questionnaireDetailDTOUpdatedAt = questionnaire ^. updatedAt
   }
 
-toDetailWithPackageDTO :: Questionnaire -> PackageDTO -> QuestionnaireDetailDTO
-toDetailWithPackageDTO questionnaire package =
+toDetailWithPackageDTO :: Questionnaire -> PackageDTO -> QuestionnaireState -> QuestionnaireDetailDTO
+toDetailWithPackageDTO questionnaire package state =
   QuestionnaireDetailDTO
   { _questionnaireDetailDTOUuid = questionnaire ^. uuid
   , _questionnaireDetailDTOName = questionnaire ^. name
   , _questionnaireDetailDTOLevel = questionnaire ^. level
   , _questionnaireDetailDTOPrivate = questionnaire ^. private
+  , _questionnaireDetailDTOState = toStateDTO state
   , _questionnaireDetailDTOPackage = package
   , _questionnaireDetailDTOSelectedTagUuids = questionnaire ^. selectedTagUuids
   , _questionnaireDetailDTOKnowledgeModel = toKnowledgeModelDTO $ questionnaire ^. knowledgeModel
