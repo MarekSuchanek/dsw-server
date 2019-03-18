@@ -8,15 +8,16 @@ services:
 
 stages:
   - build
-  - tag
+#  - tag
 
 env:
-  - PRIVATE_IMAGE="$REGISTRY/elixir/dsw-server" IMAGE="datastewardshipwizard/server" IMAGE_TAG="$PRIVATE_IMAGE:$TRAVIS_COMMIT" IMAGE_TAG_DEVELOP="$IMAGE:develop" IMAGE_TAG_LATEST="$IMAGE:latest"
+#  - PRIVATE_IMAGE="$REGISTRY/elixir/dsw-server" IMAGE="datastewardshipwizard/server" IMAGE_TAG="$PRIVATE_IMAGE:$TRAVIS_COMMIT" IMAGE_TAG_DEVELOP="$IMAGE:develop" IMAGE_TAG_LATEST="$IMAGE:latest"
 
 cache:
   directories:
   - $HOME/.stack
   - $HOME/.stack-work
+  - .stack-work
 
 install:
   # 1. Download and unpack the stack executable
@@ -29,11 +30,14 @@ install:
   # 3. Init Application Config
   - cp config/app-config.cfg.example config/app-config.cfg
   - cp config/app-config-test.cfg.example config/app-config-test.cfg
+  # 4. Analysis
+  - which stack
+  - pwd
 
-before_script:
-  # 1. Log to both public and our private Docker Registry
-  - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-  - docker login -u "$REGISTRY_USERNAME" -p "$REGISTRY_PASSWORD" "$REGISTRY"
+#before_script:
+#  # 1. Log to both public and our private Docker Registry
+#  - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+#  - docker login -u "$REGISTRY_USERNAME" -p "$REGISTRY_PASSWORD" "$REGISTRY"
 
 jobs:
   include:
@@ -47,42 +51,42 @@ jobs:
         - cd ..
         # 3. Build and Test Application
         - stack --no-terminal --skip-ghc-check test
-        # 4. Build Docker Image
-        - docker pull $IMAGE_TAG_LATEST
-        - docker build --pull --cache-from $IMAGE_TAG_LATEST -t $IMAGE_TAG .
-        - docker push $IMAGE_TAG
+#        # 4. Build Docker Image
+#        - docker pull $IMAGE_TAG_LATEST
+#        - docker build --pull --cache-from $IMAGE_TAG_LATEST -t $IMAGE_TAG .
+#        - docker push $IMAGE_TAG
 
-    - stage: tag
-      if: (branch = develop) AND (NOT (type IN (pull_request)))
-      before_install: false
-      script:
-        - docker pull $IMAGE_TAG
-        - docker image tag $IMAGE_TAG $IMAGE_TAG_DEVELOP
-        - docker push $IMAGE_TAG_DEVELOP
+#    - stage: tag
+#      if: (branch = develop) AND (NOT (type IN (pull_request)))
+#      before_install: false
+#      script:
+#        - docker pull $IMAGE_TAG
+#        - docker image tag $IMAGE_TAG $IMAGE_TAG_DEVELOP
+#        - docker push $IMAGE_TAG_DEVELOP
 
-    - stage: tag
-      if: (branch = master) AND (NOT (type IN (pull_request)))
-      before_install: false
-      script:
-        - docker pull $IMAGE_TAG
-        - docker image tag $IMAGE_TAG $IMAGE_TAG_LATEST
-        - docker push $IMAGE_TAG_LATEST
+#    - stage: tag
+#      if: (branch = master) AND (NOT (type IN (pull_request)))
+#      before_install: false
+#      script:
+#        - docker pull $IMAGE_TAG
+#        - docker image tag $IMAGE_TAG $IMAGE_TAG_LATEST
+#        - docker push $IMAGE_TAG_LATEST
 
-    - stage: tag
-      if: tag =~ ^v
-      before_install: false
-      env:
-        - PRIVATE_IMAGE="$REGISTRY/elixir/dsw-server"
-        - IMAGE="datastewardshipwizard/server"
-        - IMAGE_TAG="$PRIVATE_IMAGE:$TRAVIS_COMMIT"
-        - IMAGE_TAG_MAJOR="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v(.*)\..*\..*/\1/g"`
-        - IMAGE_TAG_MINOR="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v(.*)\..*/\1/g"`
-        - IMAGE_TAG_PATCH="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v//g"`
-      script:
-        - docker pull $IMAGE_TAG
-        - docker image tag $IMAGE_TAG $IMAGE_TAG_MAJOR
-        - docker push $IMAGE_TAG_MAJOR
-        - docker image tag $IMAGE_TAG $IMAGE_TAG_MINOR
-        - docker push $IMAGE_TAG_MINOR
-        - docker image tag $IMAGE_TAG $IMAGE_TAG_PATCH
-        - docker push $IMAGE_TAG_PATCH
+#    - stage: tag
+#      if: tag =~ ^v
+#      before_install: false
+#      env:
+#        - PRIVATE_IMAGE="$REGISTRY/elixir/dsw-server"
+#        - IMAGE="mareksuchanek/dsw-server"
+#        - IMAGE_TAG="$PRIVATE_IMAGE:$TRAVIS_COMMIT"
+#        - IMAGE_TAG_MAJOR="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v(.*)\..*\..*/\1/g"`
+#        - IMAGE_TAG_MINOR="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v(.*)\..*/\1/g"`
+#        - IMAGE_TAG_PATCH="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v//g"`
+#      script:
+#        - docker pull $IMAGE_TAG
+#        - docker image tag $IMAGE_TAG $IMAGE_TAG_MAJOR
+#        - docker push $IMAGE_TAG_MAJOR
+#        - docker image tag $IMAGE_TAG $IMAGE_TAG_MINOR
+#        - docker push $IMAGE_TAG_MINOR
+#        - docker image tag $IMAGE_TAG $IMAGE_TAG_PATCH
+#        - docker push $IMAGE_TAG_PATCH
