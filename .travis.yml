@@ -34,6 +34,7 @@ install:
   - cp config/app-config-test.cfg.example config/app-config-test.cfg
   # 4. Analysis
   - which stack
+  - stack --version
   - pwd
 
 before_script:
@@ -52,7 +53,7 @@ jobs:
         - ./build-info.sh
         - cd ..
         # 3. Build and Test Application
-        - stack --no-terminal --skip-ghc-check test
+        - stack build --no-terminal --skip-ghc-check --test
         # 4. Build Docker Image
         - docker pull $IMAGE_TAG_LATEST || true
         - docker build --pull --cache-from $IMAGE_TAG_LATEST -t $IMAGE_TAG .
