@@ -2,6 +2,11 @@ sudo: false
 dist: xenial
 language: generic
 
+addons:
+  apt:
+    packages:
+      - rabbitmq-server
+
 services:
   - mongodb
   - rabbitmq
