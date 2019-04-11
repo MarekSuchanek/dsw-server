@@ -63,6 +63,7 @@ jobs:
       if: (branch = develop) AND (NOT (type IN (pull_request)))
       cache: false
       before_install: false
+      install: false
       script:
         - docker pull $IMAGE_TAG
         - docker image tag $IMAGE_TAG $IMAGE_TAG_DEVELOP
@@ -72,6 +73,7 @@ jobs:
       if: (branch = master) AND (NOT (type IN (pull_request)))
       cache: false
       before_install: false
+      install: false
       script:
         - docker pull $IMAGE_TAG
         - docker image tag $IMAGE_TAG $IMAGE_TAG_LATEST
@@ -81,6 +83,7 @@ jobs:
       if: tag =~ ^v
       cache: false
       before_install: false
+      install: false
       env:
         - PRIVATE_IMAGE="MarekSuchanek/dsw-server-private"
         - IMAGE="MarekSuchanek/dsw-server-public"
