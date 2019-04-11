@@ -61,6 +61,8 @@ jobs:
 
     - stage: tag
       if: (branch = develop) AND (NOT (type IN (pull_request)))
+      addons: false
+      services: false
       cache: false
       before_install: false
       install: false
@@ -71,6 +73,8 @@ jobs:
 
     - stage: tag
       if: (branch = master) AND (NOT (type IN (pull_request)))
+      addons: false
+      services: false
       cache: false
       before_install: false
       install: false
@@ -81,6 +85,8 @@ jobs:
 
     - stage: tag
       if: tag =~ ^v
+      addons: false
+      services: false
       cache: false
       before_install: false
       install: false
