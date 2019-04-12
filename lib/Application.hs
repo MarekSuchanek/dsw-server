@@ -37,6 +37,7 @@ runServer :: IO ()
 runServer =
   runStdoutLoggingT $ do
     liftIO $
+      putStrLn "This is dummy fork"
       putStrLn
         "/--------------------------------------------------------------\\\n\
         \|   _____   _______          _______                           |\n\
