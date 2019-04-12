@@ -20,8 +20,6 @@ env:
 
 cache:
   directories:
-  - $HOME/.stack
-  - $HOME/.stack-work
   - .stack-work
 
 install:
@@ -47,7 +45,7 @@ jobs:
     - stage: build
       script:
         # 1. Init testing Mongo Database
-        - mongo dsw-server-test --eval 'db.collection.find()'
+        # - mongo dsw-server-test --eval 'db.collection.find()'
         # 2. Create build info inside application
         - cd scripts
         - ./build-info.sh
