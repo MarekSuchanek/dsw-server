@@ -55,8 +55,8 @@ jobs:
         # 3. Build and Test Application
         - stack build --no-terminal --skip-ghc-check --test
         # 4. Build Docker Image
-        - docker pull $IMAGE_TAG_LATEST || true
-        - docker build --pull --cache-from $IMAGE_TAG_LATEST -t $IMAGE_TAG .
+        - docker pull $IMAGE_TAG_DEVELOP || true
+        - docker build --cache-from $IMAGE_TAG_DEVELOP -t $IMAGE_TAG .
         - docker push $IMAGE_TAG
 
     - stage: tag
