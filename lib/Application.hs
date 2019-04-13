@@ -36,7 +36,7 @@ retryBackoff = exponentialBackoff retryBaseWait <> limitRetries retryCount
 runServer :: IO ()
 runServer =
   runStdoutLoggingT $ do
-    liftIO $
+    liftIO $ do
       putStrLn "This is dummy fork"
       putStrLn
         "/--------------------------------------------------------------\\\n\
