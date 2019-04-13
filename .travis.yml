@@ -20,6 +20,8 @@ env:
 
 cache:
   directories:
+  - $HOME/.stack
+  - $HOME/.stack-work
   - .stack-work
 
 install:
