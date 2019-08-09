@@ -7,22 +7,16 @@ module Service.KnowledgeModel.KnowledgeModelValidation
 import Model.Context.AppContext
 import Model.Error.Error
 import Model.Event.Event
-import Service.KnowledgeModel.KnowledgeModelApplicator
-import Service.Package.PackageService
+import Service.KnowledgeModel.KnowledgeModelService
 
 validateKmValidity :: [Event] -> Maybe String -> AppContextM (Maybe AppError)
-validateKmValidity pkgEvents mParentPkgId =
-  case mParentPkgId of
-    Just parentPkgId -> do
-      hmGetAllPreviousEventsSincePackageId parentPkgId $ \eventsFromParentPkg ->
-        hmCompileKnowledgeModelFromScratch (eventsFromParentPkg ++ pkgEvents) $ \_ -> return Nothing
-    Nothing -> hmCompileKnowledgeModelFromScratch pkgEvents $ \_ -> return Nothing
+validateKmValidity events mPackageId = hmCompileKnowledgeModel events mPackageId [] $ \_ -> return Nothing
 
 -- --------------------------------
 -- HELPERS
 -- --------------------------------
-heValidateKmValidity pkgEvents mParentPkgId callback = do
-  maybeError <- validateKmValidity pkgEvents mParentPkgId
+heValidateKmValidity pkgEvents mPreviousPkgId callback = do
+  maybeError <- validateKmValidity pkgEvents mPreviousPkgId
   case maybeError of
     Nothing -> callback
     Just error -> return . Left $ error

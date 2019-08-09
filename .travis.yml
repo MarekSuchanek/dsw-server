@@ -23,26 +23,25 @@ env:
     IMAGE_TAG_LATEST="$IMAGE:latest"
 
 cache:
+  timeout: 600
   directories:
   - $HOME/.stack
   - $HOME/.stack-work
   - .stack-work
 
 install:
-  # 1. Download and unpack the stack executable
+  # 1. Download, unpack, and check the stack executable
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
-  - travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-  # 3. Init Application Config
-  - cp config/app-config.cfg.example config/app-config.cfg
-  - cp config/app-config-test.cfg.example config/app-config-test.cfg
-  # 4. Analysis
-  - which stack
-  - stack --version
-  - pwd
+  - travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v1.9.3/stack-1.9.3-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  # 2. Init Application Config
+  - cp config/application.yml.example config/application.yml
+  - cp config/application-test.yml.example config/application-test.yml
+  - cp config/integration.yml.example config/integration.yml
+  - cp config/integration-test.yml.example config/integration-test.yml
 
 before_script:
-  # 1. Log to both public and our private Docker Registry
+  # 1. Log to public Docker Hub
   - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
 #  - docker login -u "$REGISTRY_USERNAME" -p "$REGISTRY_PASSWORD" "$REGISTRY"
 
@@ -50,8 +49,8 @@ jobs:
   include:
     - stage: build
       script:
-        # 1. Init testing Mongo Database
-        # - mongo dsw-server-test --eval 'db.collection.find()'
+        # 1. Init and check testing Mongo Database
+        - mongo dsw-server-test --eval 'db.collection.find()'
         # 2. Create build info inside application
         - cd scripts
         - ./build-info.sh
@@ -88,15 +87,11 @@ jobs:
         - docker push $IMAGE_TAG_LATEST
 
     - stage: tag
-      if: tag =~ ^v
-      addons: false
-      services: false
-      cache: false
-      before_install: false
+      if: (tag =~ ^v\d+\.\d+\.\d+$)
       install: false
       env:
-        - PRIVATE_IMAGE="mareksuchanek/dsw-server-private"
-        - IMAGE="mareksuchanek/dsw-server-public"
+        - PRIVATE_IMAGE="$REGISTRY/dsw-server"
+        - IMAGE="datastewardshipwizard/server"
         - IMAGE_TAG="$PRIVATE_IMAGE:$TRAVIS_COMMIT"
         - IMAGE_TAG_MAJOR="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v(.*)\..*\..*/\1/g"`
         - IMAGE_TAG_MINOR="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v(.*)\..*/\1/g"`
@@ -109,3 +104,16 @@ jobs:
         - docker push $IMAGE_TAG_MINOR
         - docker image tag $IMAGE_TAG $IMAGE_TAG_PATCH
         - docker push $IMAGE_TAG_PATCH
+
+    - stage: tag
+      if: (tag =~ ^v\d+\.\d+\.\d+-rc\.\d+$)
+      install: false
+      env:
+        - PRIVATE_IMAGE="$REGISTRY/dsw-server"
+        - IMAGE="datastewardshipwizard/server"
+        - IMAGE_TAG="$PRIVATE_IMAGE:$TRAVIS_COMMIT"
+        - IMAGE_TAG_RC="$IMAGE:"`echo $TRAVIS_TAG | sed -E "s/v//g"`
+      script:
+        - docker pull $IMAGE_TAG
+        - docker image tag $IMAGE_TAG $IMAGE_TAG_RC
+        - docker push $IMAGE_TAG_RC

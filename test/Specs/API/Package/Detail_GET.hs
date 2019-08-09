@@ -11,7 +11,7 @@ import Test.Hspec
 import Test.Hspec.Wai hiding (shouldRespondWith)
 import Test.Hspec.Wai.Matcher
 
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
 import Database.Migration.Development.Package.Data.Packages
 import qualified
        Database.Migration.Development.Package.PackageMigration as PKG
@@ -53,7 +53,12 @@ test_200 appContext = do
    do
     let expStatus = 200
     let expHeaders = [resCtHeader] ++ resCorsHeaders
-    let expDto = packageWithEventsToDTO globalPackage
+    let expDto =
+          toDetailDTO
+            (toPackage globalPackage)
+            [globalRemotePackage]
+            ["0.0.1", "1.0.0"]
+            ("https://registry-test.ds-wizard.org/knowledge-models/" ++ (globalPackage ^. pId))
     let expBody = encode expDto
      -- AND: Run migrations
     runInContextIO PKG.runMigration appContext
@@ -72,9 +77,16 @@ test_401 appContext = createAuthTest reqMethod reqUrl [] reqBody
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_403 appContext = createNoPermissionTest (appContext ^. config) reqMethod reqUrl [] "" "PM_READ_PERM"
+test_403 appContext = createNoPermissionTest (appContext ^. appConfig) reqMethod reqUrl [] "" "PM_READ_PERM"
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_404 appContext = createNotFoundTest reqMethod "/packages/dsw.global:non-existing-package:1.0.0" reqHeaders reqBody
+test_404 appContext =
+  createNotFoundTest
+    reqMethod
+    "/packages/dsw.global:non-existing-package:1.0.0"
+    reqHeaders
+    reqBody
+    "package"
+    "dsw.global:non-existing-package:1.0.0"

@@ -13,7 +13,7 @@ createDatabaseConnectionPool dswConfig = do
   verifyDatabaseConnectionPool dbPool
   return dbPool
   where
-    appConfigDatabase = dswConfig ^. databaseConfig
+    appConfigDatabase = dswConfig ^. database
     dbHost = appConfigDatabase ^. host
     dbPort = PortNumber (fromInteger (appConfigDatabase ^. port) :: PortNumber) :: PortID
     dbName = pack (appConfigDatabase ^. databaseName)

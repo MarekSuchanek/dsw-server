@@ -13,7 +13,7 @@ import qualified Test.Hspec.Wai.JSON as HJ
 import Test.Hspec.Wai.Matcher
 
 import Api.Resource.Branch.BranchDTO
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
 import Database.Migration.Development.Branch.Data.Branches
 import Database.Migration.Development.User.Data.Users
 import LensesConfig
@@ -80,15 +80,15 @@ test_200 appContext = do
     compareBranchDtos
       resBody
       reqDto
-      (resBody ^. parentPackageId)
-      (resBody ^. parentPackageId)
+      (resBody ^. previousPackageId)
+      (resBody ^. previousPackageId)
       (Just $ userAlbert ^. uuid)
      -- AND: Find result in DB and compare with expectation state
     assertExistenceOfBranchInDB
       appContext
       reqDto
-      (resBody ^. parentPackageId)
-      (resBody ^. parentPackageId)
+      (resBody ^. previousPackageId)
+      (resBody ^. previousPackageId)
       (Just $ userAlbert ^. uuid)
 
 -- ----------------------------------------------------
@@ -128,8 +128,8 @@ test_400_not_valid_kmId appContext = do
     assertExistenceOfBranchInDB
       appContext
       amsterdamBranch
-      (amsterdamBranch ^. parentPackageId)
-      (amsterdamBranch ^. parentPackageId)
+      (amsterdamBranch ^. previousPackageId)
+      (amsterdamBranch ^. previousPackageId)
       (Just $ userAlbert ^. uuid)
 
 -- ----------------------------------------------------
@@ -171,8 +171,8 @@ test_400_already_taken_kmId appContext = do
     assertExistenceOfBranchInDB
       appContext
       amsterdamBranch
-      (amsterdamBranch ^. parentPackageId)
-      (amsterdamBranch ^. parentPackageId)
+      (amsterdamBranch ^. previousPackageId)
+      (amsterdamBranch ^. previousPackageId)
       (Just $ userAlbert ^. uuid)
 
 -- ----------------------------------------------------
@@ -183,9 +183,16 @@ test_401 appContext = createAuthTest reqMethod reqUrl [] reqBody
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_403 appContext = createNoPermissionTest (appContext ^. config) reqMethod reqUrl [] "" "KM_PERM"
+test_403 appContext = createNoPermissionTest (appContext ^. appConfig) reqMethod reqUrl [] "" "KM_PERM"
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_404 appContext = createNotFoundTest reqMethod "/branches/dc9fe65f-748b-47ec-b30c-d255bbac64a0" reqHeaders reqBody
+test_404 appContext =
+  createNotFoundTest
+    reqMethod
+    "/branches/dc9fe65f-748b-47ec-b30c-d255bbac64a0"
+    reqHeaders
+    reqBody
+    "branch"
+    "dc9fe65f-748b-47ec-b30c-d255bbac64a0"

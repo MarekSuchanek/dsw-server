@@ -1,8 +1,7 @@
 module Model.Package.Package where
 
+import Data.Time
 import GHC.Generics
-
-import Model.Event.Event
 
 data Package = Package
   { _packagePId :: String
@@ -10,19 +9,17 @@ data Package = Package
   , _packageOrganizationId :: String
   , _packageKmId :: String
   , _packageVersion :: String
-  , _packageMetamodelVersion :: Int
   , _packageDescription :: String
-  , _packageParentPackageId :: Maybe String
+  , _packageReadme :: String
+  , _packageLicense :: String
+  , _packageMetamodelVersion :: Int
+  , _packagePreviousPackageId :: Maybe String
+  , _packageForkOfPackageId :: Maybe String
+  , _packageMergeCheckpointPackageId :: Maybe String
+  , _packageCreatedAt :: UTCTime
   } deriving (Show, Eq, Generic)
 
-data PackageWithEvents = PackageWithEvents
-  { _packageWithEventsPId :: String
-  , _packageWithEventsName :: String
-  , _packageWithEventsOrganizationId :: String
-  , _packageWithEventsKmId :: String
-  , _packageWithEventsVersion :: String
-  , _packageWithEventsMetamodelVersion :: Int
-  , _packageWithEventsDescription :: String
-  , _packageWithEventsParentPackageId :: Maybe String
-  , _packageWithEventsEvents :: [Event]
-  } deriving (Show, Eq, Generic)
+instance Ord Package where
+  compare a b =
+    (compare (_packageOrganizationId a) (_packageOrganizationId b)) <> (compare (_packageKmId a) (_packageKmId b)) <>
+    (compare (_packageVersion a) (_packageVersion b))

@@ -22,7 +22,7 @@ import Util.Logger
 
 instance Connector AppContextM where
   getIssues = do
-    dswConfig <- asks _appContextConfig
+    dswConfig <- asks _appContextAppConfig
     let fToken = dswConfig ^. feedback . token
     let fOwner = dswConfig ^. feedback . owner
     let fRepo = dswConfig ^. feedback . repo
@@ -34,7 +34,7 @@ instance Connector AppContextM where
         logError . show $ error
         return . Left . HttpClientError $ _ERROR_HTTP_CLIENT__REQUEST_FAILED "GitHub" "Get issues"
   createIssue packageId questionUuid title content = do
-    dswConfig <- asks _appContextConfig
+    dswConfig <- asks _appContextAppConfig
     let fToken = dswConfig ^. feedback . token
     let fOwner = dswConfig ^. feedback . owner
     let fRepo = dswConfig ^. feedback . repo

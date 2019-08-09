@@ -11,7 +11,8 @@ import Test.Hspec.Wai hiding (shouldRespondWith)
 import qualified Test.Hspec.Wai.JSON as HJ
 import Test.Hspec.Wai.Matcher
 
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
+import Api.Resource.Package.PackageSimpleDTO
 import Api.Resource.Version.VersionDTO
 import qualified
        Database.Migration.Development.Branch.BranchMigration as B
@@ -23,7 +24,7 @@ import Localization
 import Model.Context.AppContext
 import Model.Error.ErrorHelpers
 import Service.Package.PackageMapper
-import Service.Package.PackageService
+import Service.Version.VersionService
 
 import Specs.API.Common
 import Specs.API.Package.Common
@@ -52,7 +53,12 @@ reqUrl = "/branches/6474b24b-262b-42b1-9451-008e8363f2b6/versions/1.0.0"
 
 reqHeaders = [reqAuthHeader, reqCtHeader]
 
-reqDto = VersionDTO {_versionDTODescription = amsterdamPackage ^. description}
+reqDto =
+  VersionDTO
+  { _versionDTODescription = amsterdamPackage ^. description
+  , _versionDTOReadme = amsterdamPackage ^. readme
+  , _versionDTOLicense = amsterdamPackage ^. license
+  }
 
 reqBody = encode reqDto
 
@@ -64,8 +70,8 @@ test_201 appContext = do
      -- GIVEN: Prepare expectation
    do
     let expStatus = 201
-    let expHeaders = [resCtHeader] ++ resCorsHeaders
-    let expDto = packageWithEventsToDTO amsterdamPackage
+    let expHeaders = [resCtHeaderPlain] ++ resCorsHeadersPlain
+    let expDto = toSimpleDTO . toPackage $ amsterdamPackage
     let expBody = encode expDto
      -- AND: Run migrations
     runInContextIO PKG.runMigration appContext
@@ -73,9 +79,10 @@ test_201 appContext = do
      -- WHEN: Call API
     response <- request reqMethod reqUrl reqHeaders reqBody
      -- THEN: Compare response with expectation
-    let responseMatcher =
-          ResponseMatcher {matchHeaders = expHeaders, matchStatus = expStatus, matchBody = bodyEquals expBody}
-    response `shouldRespondWith` responseMatcher
+    let (status, headers, resBody) = destructResponse response :: (Int, ResponseHeaders, PackageSimpleDTO)
+    assertResStatus status expStatus
+    assertResHeaders headers expHeaders
+    comparePackageDtos resBody expDto
      -- AND: Find result in DB and compare with expectation state
     assertExistenceOfPackageInDB appContext expDto
 
@@ -97,6 +104,8 @@ test_400_invalid_version_format appContext = do
     let expHeaders = [resCtHeader] ++ resCorsHeaders
     let expDto = createErrorWithErrorMessage $ _ERROR_VALIDATION__INVALID_PKG_VERSION_FORMAT
     let expBody = encode expDto
+     -- AND: Run migrations
+    runInContextIO B.runMigration appContext
     -- WHEN: Call API
     response <- request reqMethod reqUrl reqHeaders reqBody
     -- THEN: Compare response with expectation
@@ -118,7 +127,7 @@ test_400_not_higher_pkg_version appContext = do
      -- AND: Run migrations
     runInContextIO PKG.runMigration appContext
     runInContextIO B.runMigration appContext
-    runInContextIO (createPackageFromKMC "6474b24b-262b-42b1-9451-008e8363f2b6" "1.0.0" reqDto) appContext
+    runInContextIO (publishPackage "6474b24b-262b-42b1-9451-008e8363f2b6" "1.0.0" reqDto) appContext
     -- WHEN: Call API
     response <- request reqMethod reqUrl reqHeaders reqBody
     -- THEN: Compare response with expectation
@@ -134,10 +143,16 @@ test_401 appContext = createAuthTest reqMethod reqUrl [] reqBody
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_403 appContext = createNoPermissionTest (appContext ^. config) reqMethod reqUrl [] "" "KM_PUBLISH_PERM"
+test_403 appContext = createNoPermissionTest (appContext ^. appConfig) reqMethod reqUrl [] "" "KM_PUBLISH_PERM"
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 test_404 appContext =
-  createNotFoundTest reqMethod "/branches/dc9fe65f-748b-47ec-b30c-d255bbac64a0/versions/1.0.0" reqHeaders reqBody
+  createNotFoundTest
+    reqMethod
+    "/branches/dc9fe65f-748b-47ec-b30c-d255bbac64a0/versions/1.0.0"
+    reqHeaders
+    reqBody
+    "branch"
+    "dc9fe65f-748b-47ec-b30c-d255bbac64a0"

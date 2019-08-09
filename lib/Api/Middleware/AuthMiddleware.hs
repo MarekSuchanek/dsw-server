@@ -18,7 +18,7 @@ import Text.Regex
 
 import Api.Handler.Common
 import Constant.Api (authorizationHeaderName)
-import LensesConfig
+import LensesConfig hiding (requestHeaders, requestMethod)
 import Localization
 import Model.Config.AppConfig
 import Service.Token.TokenService
@@ -51,9 +51,9 @@ authMiddleware dswConfig unauthorizedEndpoints app request sendResponse =
     else authorize
   where
     jwtSecret :: String
-    jwtSecret = dswConfig ^. jwtConfig ^. secret
+    jwtSecret = dswConfig ^. jwt ^. secret
     jwtVersion :: Integer
-    jwtVersion = dswConfig ^. jwtConfig ^. version
+    jwtVersion = dswConfig ^. jwt ^. version
     authorize :: IO ResponseReceived
     authorize =
       case getTokenFromHeader request of

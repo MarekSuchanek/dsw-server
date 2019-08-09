@@ -4,29 +4,40 @@ module Specs.API.Questionnaire.Detail_Report_Preview_POST
 
 import Control.Lens ((&), (.~), (^.))
 import Data.Aeson (encode)
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.UUID as U
 import Network.HTTP.Types
 import Network.Wai (Application)
 import Test.Hspec
 import Test.Hspec.Wai hiding (shouldRespondWith)
+import qualified Test.Hspec.Wai.JSON as HJ
+import Test.Hspec.Wai.Matcher
 
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
 import Api.Resource.Questionnaire.QuestionnaireChangeDTO
 import Api.Resource.Report.ReportDTO
 import Api.Resource.Report.ReportJM ()
 import Database.DAO.Package.PackageDAO
 import Database.DAO.Questionnaire.QuestionnaireDAO
-import Database.Migration.Development.KnowledgeModel.Data.Chapters
-import Database.Migration.Development.Metric.Data.Metrics
 import qualified
        Database.Migration.Development.Metric.MetricMigration as MTR
 import Database.Migration.Development.Package.Data.Packages
-import Database.Migration.Development.PublicQuestionnaire.Data.PublicQuestionnaires
 import Database.Migration.Development.Questionnaire.Data.Questionnaires
+import qualified
+       Database.Migration.Development.Questionnaire.QuestionnaireMigration
+       as QTN
+import Database.Migration.Development.Report.Data.Reports
+import qualified Database.Migration.Development.User.UserMigration
+       as U
 import LensesConfig
+import Localization
 import Model.Context.AppContext
+import Model.Error.Error
 import Service.Questionnaire.QuestionnaireMapper
+import Service.Report.ReportMapper
 
 import Specs.API.Common
+import Specs.API.Questionnaire.Common
 import Specs.Common
 
 -- ------------------------------------------------------------------------
@@ -36,6 +47,7 @@ detail_report_preview_post :: AppContext -> SpecWith Application
 detail_report_preview_post appContext =
   describe "POST /questionnaires/{qtnUuid}/report/preview" $ do
     test_200 appContext
+    test_400 appContext
     test_401 appContext
     test_403 appContext
     test_404 appContext
@@ -45,21 +57,21 @@ detail_report_preview_post appContext =
 -- ----------------------------------------------------
 reqMethod = methodPost
 
-reqUrl = "/questionnaires/af984a75-56e3-49f8-b16f-d6b99599910a/report/preview"
+reqUrlT qtnUuid = BS.pack $ "/questionnaires/" ++ U.toString qtnUuid ++ "/report/preview"
 
-reqHeaders = [reqAuthHeader, reqCtHeader]
+reqHeadersT authHeader = [authHeader, reqCtHeader]
 
 reqDto =
   QuestionnaireChangeDTO
-  { _questionnaireChangeDTOName = "EDITED" ++ (publicQuestionnaire ^. name)
-  , _questionnaireChangeDTOPrivate = False
+  { _questionnaireChangeDTOName = questionnaire1Edited ^. name
+  , _questionnaireChangeDTOAccessibility = questionnaire1Edited ^. accessibility
   , _questionnaireChangeDTOLevel = 3
   , _questionnaireChangeDTOReplies =
       toReplyDTO <$>
-      [ fQ1
-      , fQ2
+      [ rQ1
+      , rQ2
       , rQ2_aYes_fuQ1
-      , fQ3
+      , rQ3
       , rQ4
       , rQ4_it1_itemName
       , rQ4_it1_q5
@@ -70,7 +82,10 @@ reqDto =
       , rQ4_it2_itemName
       , rQ4_it2_q5
       , rQ4_it2_q6
+      , rQ9
+      , rQ10
       ]
+  , _questionnaireChangeDTOLabels = []
   }
 
 reqBody = encode reqDto
@@ -78,17 +93,24 @@ reqBody = encode reqDto
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_200 appContext =
-  it "HTTP 200 OK" $
-     -- GIVEN: Prepare expectation
+test_200 appContext = do
+  create_test_200 "HTTP 200 OK (Owner, Private)" appContext questionnaire1 reqAuthHeader
+  create_test_200 "HTTP 200 OK (Non-Owner, PublicReadOnly)" appContext questionnaire2 reqNonAdminAuthHeader
+  create_test_200 "HTTP 200 OK (Non-Owner, Public)" appContext questionnaire3 reqNonAdminAuthHeader
+
+create_test_200 title appContext qtn authHeader =
+  it title $
+     -- GIVEN: Prepare request
    do
+    let reqUrl = reqUrlT $ qtn ^. uuid
+    let reqHeaders = reqHeadersT reqAuthHeader
+     -- GIVEN: Prepare expectation
     let expStatus = 200
     let expHeaders = [resCtHeaderPlain] ++ resCorsHeadersPlain
-    let expDto = toDetailWithPackageWithEventsDTO publicQuestionnaire netherlandsPackageV2
-    let expBody = encode expDto
+    let expDto = toReportDTO report1
      -- AND: Run migrations
     runInContextIO (insertPackage germanyPackage) appContext
-    runInContextIO (insertQuestionnaire (questionnaire1 & replies .~ [])) appContext
+    runInContextIO (insertQuestionnaire (qtn & replies .~ [])) appContext
     runInContextIO MTR.runMigration appContext
      -- WHEN: Call API
     response <- request reqMethod reqUrl reqHeaders reqBody
@@ -96,40 +118,56 @@ test_200 appContext =
     let (status, headers, resBody) = destructResponse response :: (Int, ResponseHeaders, ReportDTO)
     assertResStatus status expStatus
     assertResHeaders headers expHeaders
-    -- AND: Compare body
-    let rs = resBody ^. chapterReports
-    liftIO $ (length rs) `shouldBe` 2
-    -- Chapter report 1
-    let r1 = rs !! 0
-    liftIO $ (r1 ^. chapterUuid) `shouldBe` (chapter1 ^. uuid)
-    let (AnsweredIndicationDTO' i1) = (r1 ^. indications) !! 0
-    liftIO $ (i1 ^. answeredQuestions) `shouldBe` 3
-    liftIO $ (i1 ^. unansweredQuestions) `shouldBe` 0
-    let m1 = (r1 ^. metrics) !! 0
-    liftIO $ (m1 ^. metricUuid) `shouldBe` metricF ^. uuid
-    liftIO $ (m1 ^. measure) `shouldBe` 0
-    -- Chapter report 2
-    let r2 = rs !! 1
-    liftIO $ (r2 ^. chapterUuid) `shouldBe` (chapter2 ^. uuid)
-    let (AnsweredIndicationDTO' i2) = (r2 ^. indications) !! 0
-    liftIO $ (i2 ^. answeredQuestions) `shouldBe` 10
-    liftIO $ (i2 ^. unansweredQuestions) `shouldBe` 1
-    let m2 = (r2 ^. metrics) !! 0
-    liftIO $ (m2 ^. metricUuid) `shouldBe` metricF ^. uuid
-    liftIO $ (m2 ^. measure) `shouldBe` 1
+    compareReportDtos resBody expDto
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_401 appContext = createAuthTest reqMethod reqUrl [] reqBody
+test_400 appContext =
+  createInvalidJsonTest
+    reqMethod
+    (reqUrlT $ questionnaire3 ^. uuid)
+    [HJ.json| { name: "Common Questionnaire" } |]
+    "accessibility"
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_403 appContext = createNoPermissionTest (appContext ^. config) reqMethod reqUrl [] "" "QTN_PERM"
+test_401 appContext = createAuthTest reqMethod (reqUrlT $ questionnaire3 ^. uuid) [] reqBody
+
+-- ----------------------------------------------------
+-- ----------------------------------------------------
+-- ----------------------------------------------------
+test_403 appContext = do
+  createNoPermissionTest (appContext ^. appConfig) reqMethod (reqUrlT $ questionnaire3 ^. uuid) [] "" "QTN_PERM"
+  it "HTTP 403 FORBIDDEN (Non-Owner, Private)" $
+     -- GIVEN: Prepare request
+   do
+    let reqUrl = reqUrlT (questionnaire1 ^. uuid)
+    let reqHeaders = reqHeadersT reqNonAdminAuthHeader
+     -- AND: Prepare expectation
+    let expStatus = 403
+    let expHeaders = [resCtHeader] ++ resCorsHeaders
+    let expDto = ForbiddenError $ _ERROR_VALIDATION__FORBIDDEN "Get Questionnaire"
+    let expBody = encode expDto
+     -- AND: Run migrations
+    runInContextIO U.runMigration appContext
+    runInContextIO QTN.runMigration appContext
+     -- WHEN: Call API
+    response <- request reqMethod reqUrl reqHeaders reqBody
+     -- THEN: Compare response with expectation
+    let responseMatcher =
+          ResponseMatcher {matchHeaders = expHeaders, matchStatus = expStatus, matchBody = bodyEquals expBody}
+    response `shouldRespondWith` responseMatcher
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 test_404 appContext =
-  createNotFoundTest reqMethod "/questionnaires/f08ead5f-746d-411b-aee6-77ea3d24016a/report/preview" reqHeaders reqBody
+  createNotFoundTest
+    reqMethod
+    "/questionnaires/f08ead5f-746d-411b-aee6-77ea3d24016a/report/preview"
+    (reqHeadersT reqAuthHeader)
+    reqBody
+    "questionnaire"
+    "f08ead5f-746d-411b-aee6-77ea3d24016a"

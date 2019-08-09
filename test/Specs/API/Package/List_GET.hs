@@ -10,10 +10,13 @@ import Test.Hspec
 import Test.Hspec.Wai hiding (shouldRespondWith)
 import Test.Hspec.Wai.Matcher
 
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
 import Database.Migration.Development.Package.Data.Packages
 import qualified
        Database.Migration.Development.Package.PackageMigration as PKG
+import qualified
+       Database.Migration.Development.Questionnaire.QuestionnaireMigration
+       as QTN
 import LensesConfig
 import Model.Context.AppContext
 import Service.Package.PackageMapper
@@ -52,10 +55,14 @@ test_200 appContext = do
     let expStatus = 200
     let expHeaders = [resCtHeader] ++ resCorsHeaders
     let expDto =
-          packageWithEventsToDTO <$> [globalPackageEmpty, globalPackage, netherlandsPackage, netherlandsPackageV2]
+          [ toSimpleDTO' (toPackage globalPackage) [globalRemotePackage] ["0.0.1", "1.0.0"]
+          , toSimpleDTO' (toPackage germanyPackage) [] ["1.0.0"]
+          , toSimpleDTO' (toPackage netherlandsPackageV2) [globalNetherlandsPackage] ["1.0.0", "2.0.0"]
+          ]
     let expBody = encode expDto
      -- AND: Run migrations
     runInContextIO PKG.runMigration appContext
+    runInContextIO QTN.runMigration appContext
      -- WHEN: Call API
     response <- request reqMethod reqUrl reqHeaders reqBody
      -- THEN: Compare response with expectation
@@ -71,4 +78,4 @@ test_401 appContext = createAuthTest reqMethod reqUrl [] reqBody
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_403 appContext = createNoPermissionTest (appContext ^. config) reqMethod reqUrl [] "" "PM_READ_PERM"
+test_403 appContext = createNoPermissionTest (appContext ^. appConfig) reqMethod reqUrl [] "" "PM_READ_PERM"

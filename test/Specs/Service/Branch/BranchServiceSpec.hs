@@ -7,8 +7,8 @@ import qualified Data.UUID as U
 import Test.Hspec hiding (shouldBe)
 import Test.Hspec.Expectations.Pretty
 
-import Api.Resource.Migrator.MigratorConflictDTO
-import Api.Resource.Migrator.MigratorStateCreateDTO
+import Api.Resource.Migration.KnowledgeModel.MigratorConflictDTO
+import Api.Resource.Migration.KnowledgeModel.MigratorStateCreateDTO
 import Database.DAO.Event.EventDAO
 import Database.DAO.Package.PackageDAO
 import qualified
@@ -20,9 +20,9 @@ import qualified
        Database.Migration.Development.Package.PackageMigration as PKG
 import LensesConfig
 import Model.Branch.BranchState
-import Model.Migrator.MigratorState
+import Model.Migration.KnowledgeModel.MigratorState
 import Service.Branch.BranchService
-import Service.Migrator.MigratorService
+import Service.Migration.KnowledgeModel.MigratorService
 
 import Specs.Common
 
@@ -123,7 +123,7 @@ branchServiceIntegrationSpec appContext =
         runInContext (createMigration branchUuid migratorCreateDto) appContext
         let reqDto =
               MigratorConflictDTO
-              { _migratorConflictDTOOriginalEventUuid = a_km1_ch3 ^. uuid
+              { _migratorConflictDTOOriginalEventUuid = a_km1_ch4 ^. uuid
               , _migratorConflictDTOAction = MCAReject
               , _migratorConflictDTOEvent = Nothing
               }

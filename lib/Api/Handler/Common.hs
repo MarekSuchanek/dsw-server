@@ -1,7 +1,7 @@
 module Api.Handler.Common where
 
 import Control.Lens ((^.))
-import Control.Monad.Logger (runStdoutLoggingT)
+import Control.Monad.Logger (MonadLogger, runStdoutLoggingT)
 import Control.Monad.Reader (asks, lift, liftIO, runReaderT)
 import Data.Aeson ((.=), eitherDecode, encode, object)
 import qualified Data.ByteString.Lazy as BSL
@@ -16,14 +16,14 @@ import Network.HTTP.Types.Status
         unauthorized401)
 import Network.Wai
 import Web.Scotty.Trans
-       (ActionT, addHeader, body, header, json, params, raw, request,
-        status)
+       (ActionT, ScottyError, addHeader, body, header, json,
+        liftAndCatchIO, params, raw, request, showError, status)
 
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
 import Constant.Api
        (authorizationHeaderName, xDSWTraceUuidHeaderName)
 import Constant.Component
-import LensesConfig
+import LensesConfig hiding (requestMethod)
 import Localization
 import Model.Context.AppContext
 import Model.Context.BaseContext
@@ -40,34 +40,42 @@ type Endpoint = ActionT LT.Text BaseContextM ()
 runInUnauthService function = do
   traceUuid <- liftIO generateUuid
   addHeader (LT.pack xDSWTraceUuidHeaderName) (LT.pack . U.toString $ traceUuid)
-  dswConfig <- lift $ asks _baseContextConfig
+  appConfig <- lift $ asks _baseContextAppConfig
+  buildInfoConfig <- lift $ asks _baseContextBuildInfoConfig
   dbPool <- lift $ asks _baseContextPool
   msgChannel <- lift $ asks _baseContextMsgChannel
+  httpClientManager <- lift $ asks _baseContextHttpClientManager
   let appContext =
         AppContext
-        { _appContextConfig = dswConfig
+        { _appContextAppConfig = appConfig
+        , _appContextBuildInfoConfig = buildInfoConfig
         , _appContextPool = dbPool
         , _appContextMsgChannel = msgChannel
+        , _appContextHttpClientManager = httpClientManager
         , _appContextTraceUuid = traceUuid
         , _appContextCurrentUser = Nothing
         }
-  lift . BaseContextM . lift . lift $ runStdoutLoggingT $ runReaderT (runAppContextM function) appContext
+  liftAndCatchIO $ runStdoutLoggingT $ runReaderT (runAppContextM function) appContext
 
 runInAuthService user function = do
   traceUuid <- liftIO generateUuid
   addHeader (LT.pack xDSWTraceUuidHeaderName) (LT.pack . U.toString $ traceUuid)
-  dswConfig <- lift $ asks _baseContextConfig
+  appConfig <- lift $ asks _baseContextAppConfig
+  buildInfoConfig <- lift $ asks _baseContextBuildInfoConfig
   dbPool <- lift $ asks _baseContextPool
   msgChannel <- lift $ asks _baseContextMsgChannel
+  httpClientManager <- lift $ asks _baseContextHttpClientManager
   let appContext =
         AppContext
-        { _appContextConfig = dswConfig
+        { _appContextAppConfig = appConfig
+        , _appContextBuildInfoConfig = buildInfoConfig
         , _appContextPool = dbPool
         , _appContextMsgChannel = msgChannel
+        , _appContextHttpClientManager = httpClientManager
         , _appContextTraceUuid = traceUuid
         , _appContextCurrentUser = Just user
         }
-  lift . BaseContextM . lift . lift $ runStdoutLoggingT $ runReaderT (runAppContextM function) appContext
+  liftAndCatchIO $ runStdoutLoggingT $ runReaderT (runAppContextM $ function) appContext
 
 getAuthServiceExecutor callback = getCurrentUser $ \user -> callback $ runInAuthService user
 
@@ -91,7 +99,7 @@ getCurrentUser callback =
     eitherUser <- runInUnauthService $ getUserById userUuid
     case eitherUser of
       Right user -> callback user
-      Left error -> sendError error
+      Left error -> unauthorizedA (_ERROR_SERVICE_TOKEN__USER_ABSENCE userUuid)
 
 getQueryParam paramName = do
   reqParams <- params
@@ -125,7 +133,7 @@ checkPermission perm callback = do
 
 checkServiceToken callback = do
   tokenHeader <- header (LT.pack authorizationHeaderName)
-  dswConfig <- lift $ asks _baseContextConfig
+  dswConfig <- lift $ asks _baseContextAppConfig
   let mToken =
         tokenHeader >>= (\token -> Just . LT.toStrict $ token) >>= separateToken >>= validateServiceToken dswConfig
   case mToken of
@@ -133,7 +141,7 @@ checkServiceToken callback = do
     Nothing -> unauthorizedA _ERROR_SERVICE_TOKEN__UNABLE_TO_GET_OR_VERIFY_SEVICE_TOKEN
   where
     validateServiceToken dswConfig token = do
-      if token == (T.pack $ dswConfig ^. webConfig . serviceToken)
+      if token == (T.pack $ dswConfig ^. general . serviceToken)
         then Just token
         else Nothing
 
@@ -166,6 +174,9 @@ sendError (HttpClientError errorMessage) = do
   lift $ logError errorMessage
   status internalServerError500
   json $ HttpClientError errorMessage
+sendError (ForbiddenError errorMessage) = do
+  status forbidden403
+  json $ ForbiddenError errorMessage
 sendError (GeneralServerError errorMessage) = do
   lift $ logError errorMessage
   status internalServerError500
@@ -202,3 +213,10 @@ notFoundA = do
       lift . logInfo $ msg _CMP_API "Request does not match any route"
       status notFound404
       json $ object ["status" .= 404, "error" .= "Not Found"]
+
+internalServerErrorA :: (ScottyError e, Monad m, MonadLogger m) => e -> ActionT e m ()
+internalServerErrorA e = do
+  let message = LT.unpack . showError $ e
+  lift . logError $ message
+  status internalServerError500
+  json . GeneralServerError $ message

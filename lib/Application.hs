@@ -1,4 +1,6 @@
-module Application where
+module Application
+  ( runServer
+  ) where
 
 import Control.Lens ((^.))
 import Control.Monad.Catch
@@ -15,17 +17,22 @@ import Constant.Component
 import Database.Connection
 import qualified Database.Migration.Development.Migration as DM
 import qualified Database.Migration.Production.Migration as PM
+import Integration.Http.Common.HttpClientFactory
 import LensesConfig
 import Messaging.Connection
 import Model.Config.Environment
 import Model.Context.AppContextHelpers
 import Model.Context.BaseContext
-import Service.Config.ConfigLoader
+import Service.Config.ApplicationConfigService
+import Service.Config.BuildInfoConfigService
+import qualified Service.Migration.Metamodel.MigratorService as MM
 import Util.Logger
 
-applicationConfigFile = "config/app-config.cfg"
+import System.IO
 
-buildInfoFile = "config/build-info.cfg"
+applicationConfigFile = "config/application.yml"
+
+buildInfoFile = "config/build-info.yml"
 
 retryCount = 5
 
@@ -34,7 +41,8 @@ retryBaseWait = 2000000
 retryBackoff = exponentialBackoff retryBaseWait <> limitRetries retryCount
 
 runServer :: IO ()
-runServer =
+runServer = do
+  hSetBuffering stdout LineBuffering
   runStdoutLoggingT $ do
     liftIO $
       putStrLn
@@ -48,40 +56,37 @@ runServer =
         \|                                                              |\n\
         \\\--------------------------------------------------------------/"
     logInfo $ msg _CMP_SERVER "started"
-    eitherDspConfig <- liftIO $ loadDSWConfig applicationConfigFile buildInfoFile
-    case eitherDspConfig of
-      Left (errorDate, reason) -> do
-        logError $ msg _CMP_CONFIG "load failed"
-        logError $
-          msg _CMP_CONFIG "Can't load app-config.cfg or build-info.cfg. Maybe the file is missing or not well-formatted"
-        logError $ msg _CMP_CONFIG (show errorDate)
-      Right dswConfig -> do
-        logInfo $ msg _CMP_CONFIG "loaded"
-        logInfo $ "ENVIRONMENT: set to " ++ (show $ dswConfig ^. environment . env)
-        logInfo $ msg _CMP_DATABASE "connecting to the database"
-        dbPool <-
-          liftIO $
-          withRetry
-            retryBackoff
-            _CMP_DATABASE
-            "failed to connect to the database"
-            (createDatabaseConnectionPool dswConfig)
-        logInfo $ msg _CMP_DATABASE "connected"
-        logInfo $ msg _CMP_MESSAGING "connecting to the message broker"
-        msgChannel <-
-          liftIO $
-          withRetry
-            retryBackoff
-            _CMP_MESSAGING
-            "failed to connect to the message broker"
-            (createMessagingChannel dswConfig)
-        logInfo $ msg _CMP_MESSAGING "connected"
-        let serverPort = dswConfig ^. webConfig ^. port
+    hLoadConfig applicationConfigFile getApplicationConfig $ \appConfig ->
+      hLoadConfig buildInfoFile getBuildInfoConfig $ \buildInfoConfig -> do
+        logInfo $ "ENVIRONMENT: set to " ++ (show $ appConfig ^. general . environment)
+        dbPool <- connectDB appConfig
+        msgChannel <- connectMQ appConfig
+        httpClientManager <- setupHttpClientManager appConfig
         let baseContext =
               BaseContext
-              {_baseContextConfig = dswConfig, _baseContextPool = dbPool, _baseContextMsgChannel = msgChannel}
+              { _baseContextAppConfig = appConfig
+              , _baseContextBuildInfoConfig = buildInfoConfig
+              , _baseContextPool = dbPool
+              , _baseContextMsgChannel = msgChannel
+              , _baseContextHttpClientManager = httpClientManager
+              }
         liftIO $ runDBMigrations baseContext
+        liftIO $ runMetamodelMigrations baseContext
         liftIO $ runApplication baseContext
+
+-- --------------------------------
+-- PRIVATE
+-- --------------------------------
+hLoadConfig fileName loadFn callback = do
+  eitherConfig <- liftIO (loadFn fileName)
+  case eitherConfig of
+    Right config -> do
+      logInfo $ msg _CMP_CONFIG ("'" ++ fileName ++ "' loaded")
+      callback config
+    Left error -> do
+      logError $ msg _CMP_CONFIG "load failed"
+      logError $ msg _CMP_CONFIG ("can't load '" ++ fileName ++ "'. Maybe the file is missing or not well-formatted")
+      logError $ msg _CMP_CONFIG (show error)
 
 withRetry :: RetryPolicyM IO -> String -> String -> IO a -> IO a
 withRetry backoff _CMP description action = recovering backoff handlers wrappedAction
@@ -101,12 +106,45 @@ withRetry backoff _CMP description action = recovering backoff handlers wrappedA
         else runStdoutLoggingT $ logError $ msg _CMP description
       return True
 
+connectDB appConfig = do
+  logInfo $ msg _CMP_DATABASE "connecting to the database"
+  dbPool <-
+    liftIO $
+    withRetry retryBackoff _CMP_DATABASE "failed to connect to the database" (createDatabaseConnectionPool appConfig)
+  logInfo $ msg _CMP_DATABASE "connected"
+  return dbPool
+
+connectMQ appConfig =
+  if (appConfig ^. messaging ^. enabled)
+    then do
+      logInfo $ msg _CMP_MESSAGING "connecting to the message broker"
+      msgChannel <-
+        liftIO $
+        withRetry
+          retryBackoff
+          _CMP_MESSAGING
+          "failed to connect to the message broker"
+          (createMessagingChannel appConfig)
+      logInfo $ msg _CMP_MESSAGING "connected"
+      return msgChannel
+    else do
+      logInfo $ msg _CMP_MESSAGING "not enabled - skipping"
+      return Nothing
+
+setupHttpClientManager appConfig = do
+  logInfo $ msg _CMP_INTEGRATION "creating http client manager"
+  httpClientManager <- liftIO $ createHttpClientManager appConfig
+  logInfo $ msg _CMP_INTEGRATION "http client manager successfully created"
+  return httpClientManager
+
 runDBMigrations context =
-  case context ^. config . environment . env of
+  case context ^. appConfig . general . environment of
     Development -> runStdoutLoggingT $ runAppContextWithBaseContext DM.runMigration context
     Staging -> runStdoutLoggingT $ PM.runMigration context
     Production -> runStdoutLoggingT $ PM.runMigration context
     _ -> return ()
+
+runMetamodelMigrations context = runStdoutLoggingT $ runAppContextWithBaseContext MM.migrateCompleteDatabase context
 
 runApplication :: BaseContext -> IO ()
 runApplication context = do
@@ -119,7 +157,7 @@ getOptions context =
   def
   { settings = getSettings context
   , verbose =
-      case context ^. config . environment . env of
+      case context ^. appConfig . general . environment of
         Production -> 0
         Staging -> 1
         Development -> 1
@@ -128,5 +166,5 @@ getOptions context =
 
 getSettings :: BaseContext -> Settings
 getSettings context =
-  let webPort = context ^. config . webConfig . port
+  let webPort = context ^. appConfig . general . serverPort
   in setPort webPort defaultSettings
