@@ -1,54 +1,41 @@
 module Database.BSON.Questionnaire.Questionnaire where
 
-import Control.Lens ((^.))
 import qualified Data.Bson as BSON
 import Data.Bson.Generic
+import Data.Maybe ()
 
-import Database.BSON.Common
-import Database.BSON.KnowledgeModel.KnowledgeModel ()
+import Database.BSON.Common ()
+import Database.BSON.Questionnaire.QuestionnaireAccessibility ()
+import Database.BSON.Questionnaire.QuestionnaireLabel ()
 import Database.BSON.Questionnaire.QuestionnaireReply ()
-import LensesConfig
 import Model.Questionnaire.Questionnaire
 
 instance ToBSON Questionnaire where
-  toBSON questionnaire =
-    [ "uuid" BSON.=: serializeUUID (questionnaire ^. uuid)
-    , "name" BSON.=: (questionnaire ^. name)
-    , "level" BSON.=: (questionnaire ^. level)
-    , "private" BSON.=: (questionnaire ^. private)
-    , "packageId" BSON.=: (questionnaire ^. packageId)
-    , "selectedTagUuids" BSON.=: serializeUUIDList (questionnaire ^. selectedTagUuids)
-    , "knowledgeModel" BSON.=: (questionnaire ^. knowledgeModel)
-    , "replies" BSON.=: (questionnaire ^. replies)
-    , "ownerUuid" BSON.=: serializeMaybeUUID (questionnaire ^. ownerUuid)
-    , "createdAt" BSON.=: (questionnaire ^. createdAt)
-    , "updatedAt" BSON.=: (questionnaire ^. updatedAt)
+  toBSON Questionnaire {..} =
+    [ "uuid" BSON.=: _questionnaireUuid
+    , "name" BSON.=: _questionnaireName
+    , "level" BSON.=: _questionnaireLevel
+    , "accessibility" BSON.=: _questionnaireAccessibility
+    , "packageId" BSON.=: _questionnairePackageId
+    , "selectedTagUuids" BSON.=: _questionnaireSelectedTagUuids
+    , "ownerUuid" BSON.=: _questionnaireOwnerUuid
+    , "replies" BSON.=: _questionnaireReplies
+    , "labels" BSON.=: _questionnaireLabels
+    , "createdAt" BSON.=: _questionnaireCreatedAt
+    , "updatedAt" BSON.=: _questionnaireUpdatedAt
     ]
 
 instance FromBSON Questionnaire where
   fromBSON doc = do
-    uuid <- deserializeMaybeUUID $ BSON.lookup "uuid" doc
-    name <- BSON.lookup "name" doc
-    level <- BSON.lookup "level" doc
-    private <- BSON.lookup "private" doc
-    packageId <- BSON.lookup "packageId" doc
-    selectedTagUuids <- deserializeMaybeUUIDList $ BSON.lookup "selectedTagUuids" doc
-    knowledgeModel <- BSON.lookup "knowledgeModel" doc
-    replies <- BSON.lookup "replies" doc
-    let ownerUuid = deserializeMaybeUUID $ BSON.lookup "ownerUuid" doc
-    createdAt <- BSON.lookup "createdAt" doc
-    updatedAt <- BSON.lookup "updatedAt" doc
-    return
-      Questionnaire
-      { _questionnaireUuid = uuid
-      , _questionnaireName = name
-      , _questionnaireLevel = level
-      , _questionnairePrivate = private
-      , _questionnairePackageId = packageId
-      , _questionnaireSelectedTagUuids = selectedTagUuids
-      , _questionnaireKnowledgeModel = knowledgeModel
-      , _questionnaireReplies = replies
-      , _questionnaireOwnerUuid = ownerUuid
-      , _questionnaireCreatedAt = createdAt
-      , _questionnaireUpdatedAt = updatedAt
-      }
+    _questionnaireUuid <- BSON.lookup "uuid" doc
+    _questionnaireName <- BSON.lookup "name" doc
+    _questionnaireLevel <- BSON.lookup "level" doc
+    _questionnaireAccessibility <- BSON.lookup "accessibility" doc
+    _questionnairePackageId <- BSON.lookup "packageId" doc
+    _questionnaireSelectedTagUuids <- BSON.lookup "selectedTagUuids" doc
+    let _questionnaireOwnerUuid = BSON.lookup "ownerUuid" doc
+    _questionnaireReplies <- BSON.lookup "replies" doc
+    _questionnaireLabels <- BSON.lookup "labels" doc
+    _questionnaireCreatedAt <- BSON.lookup "createdAt" doc
+    _questionnaireUpdatedAt <- BSON.lookup "updatedAt" doc
+    return Questionnaire {..}

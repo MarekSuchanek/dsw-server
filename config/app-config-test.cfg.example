@@ -50,4 +50,4 @@ email =
 token =
 owner = MarekSuchanek
 repo = testing
-issueurl = https://github.com/:owner/:dsw-staging/issues/:issueId
+issueurl = https://github.com/:owner/:repo/issues/:issueId

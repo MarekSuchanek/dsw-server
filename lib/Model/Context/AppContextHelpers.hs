@@ -13,9 +13,11 @@ runAppContextWithBaseContext function baseContext = do
   traceUuid <- liftIO generateUuid
   let appContext =
         AppContext
-        { _appContextConfig = baseContext ^. config
+        { _appContextAppConfig = baseContext ^. appConfig
+        , _appContextBuildInfoConfig = baseContext ^. buildInfoConfig
         , _appContextPool = baseContext ^. pool
         , _appContextMsgChannel = baseContext ^. msgChannel
+        , _appContextHttpClientManager = baseContext ^. httpClientManager
         , _appContextTraceUuid = traceUuid
         , _appContextCurrentUser = Nothing
         }

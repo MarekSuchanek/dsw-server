@@ -4,7 +4,7 @@ import Control.Lens ((^.))
 import Test.Hspec
 import Test.Hspec.Wai hiding (shouldRespondWith)
 
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
 import Database.DAO.Package.PackageDAO
 import LensesConfig
 
@@ -27,4 +27,3 @@ comparePackageDtos resDto expDto = do
   liftIO $ (resDto ^. kmId) `shouldBe` (expDto ^. kmId)
   liftIO $ (resDto ^. version) `shouldBe` (expDto ^. version)
   liftIO $ (resDto ^. description) `shouldBe` (expDto ^. description)
-  liftIO $ (resDto ^. parentPackageId) `shouldBe` (expDto ^. parentPackageId)

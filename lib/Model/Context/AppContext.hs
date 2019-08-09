@@ -7,14 +7,18 @@ import Control.Monad.Reader (MonadReader, ReaderT)
 import qualified Data.UUID as U
 import Database.Persist.MongoDB (ConnectionPool)
 import Network.AMQP (Channel)
+import Network.HTTP.Client (Manager)
 
 import Api.Resource.User.UserDTO
 import Model.Config.AppConfig
+import Model.Config.BuildInfoConfig
 
 data AppContext = AppContext
-  { _appContextConfig :: AppConfig
+  { _appContextAppConfig :: AppConfig
+  , _appContextBuildInfoConfig :: BuildInfoConfig
   , _appContextPool :: ConnectionPool
-  , _appContextMsgChannel :: Channel
+  , _appContextMsgChannel :: Maybe Channel
+  , _appContextHttpClientManager :: Manager
   , _appContextTraceUuid :: U.UUID
   , _appContextCurrentUser :: Maybe UserDTO
   }

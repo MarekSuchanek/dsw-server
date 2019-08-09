@@ -12,7 +12,7 @@ import Test.Hspec
 import Test.Hspec.Wai hiding (shouldRespondWith)
 import Test.Hspec.Wai.Matcher
 
-import Api.Resource.Error.ErrorDTO ()
+import Api.Resource.Error.ErrorJM ()
 import Database.DAO.Package.PackageDAO
 import qualified
        Database.Migration.Development.Branch.BranchMigration as B
@@ -36,6 +36,7 @@ detail_delete :: AppContext -> SpecWith Application
 detail_delete appContext =
   describe "DELETE /packages/{pkgId}" $ do
     test_204 appContext
+    test_400 appContext
     test_401 appContext
     test_403 appContext
     test_404 appContext
@@ -118,9 +119,16 @@ test_401 appContext = createAuthTest reqMethod reqUrl [] reqBody
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_403 appContext = createNoPermissionTest (appContext ^. config) reqMethod reqUrl [] reqBody "PM_WRITE_PERM"
+test_403 appContext = createNoPermissionTest (appContext ^. appConfig) reqMethod reqUrl [] reqBody "PM_WRITE_PERM"
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 -- ----------------------------------------------------
-test_404 appContext = createNotFoundTest reqMethod "/packages/dsw.global:non-existing-package:1.0.0" reqHeaders reqBody
+test_404 appContext =
+  createNotFoundTest
+    reqMethod
+    "/packages/dsw.global:non-existing-package:1.0.0"
+    reqHeaders
+    reqBody
+    "package"
+    "dsw.global:non-existing-package:1.0.0"

@@ -45,6 +45,30 @@ import qualified
 import qualified
        Database.Migration.Production.Migration_0014_purge_database.Migration
        as M_0014
+import qualified
+       Database.Migration.Production.Migration_0015_remove_cached_km.Migration
+       as M_0015
+import qualified
+       Database.Migration.Production.Migration_0016_metamodel_version.Migration
+       as M_0016
+import qualified
+       Database.Migration.Production.Migration_0017_questionnaire_accessibility.Migration
+       as M_0017
+import qualified
+       Database.Migration.Production.Migration_0018_package_readme_and_createdAt.Migration
+       as M_0018
+import qualified
+       Database.Migration.Production.Migration_0019_bson_hashmap.Migration
+       as M_0019
+import qualified
+       Database.Migration.Production.Migration_0020_package_license.Migration
+       as M_0020
+import qualified
+       Database.Migration.Production.Migration_0021_questionniare_labels.Migration
+       as M_0021
+import qualified
+       Database.Migration.Production.Migration_0022_forkOfPackageId_and_mergeCheckpointPackageId.Migration
+       as M_0022
 import Database.MongoDB.Migration.Entity
 import Database.MongoDB.Migration.Migration
 import LensesConfig
@@ -69,4 +93,12 @@ migrationDefinitions =
   , M_0012.definition
   , M_0013.definition
   , M_0014.definition
+  , M_0015.definition
+  , M_0016.definition
+  , M_0017.definition
+  , M_0018.definition
+  , M_0019.definition
+  , M_0020.definition
+  , M_0021.definition
+  , M_0022.definition
   ]

@@ -1,7 +1,7 @@
 module Service.Questionnaire.QuestionnaireService where
 
 import Control.Lens ((^.))
-import Control.Monad.Reader (liftIO)
+import Control.Monad.Reader (asks, liftIO)
 import Data.Time
 import qualified Data.UUID as U
 
@@ -9,6 +9,7 @@ import Api.Resource.Questionnaire.QuestionnaireChangeDTO
 import Api.Resource.Questionnaire.QuestionnaireCreateDTO
 import Api.Resource.Questionnaire.QuestionnaireDTO
 import Api.Resource.Questionnaire.QuestionnaireDetailDTO
+import Database.DAO.Migration.Questionnaire.MigratorDAO
 import Database.DAO.Package.PackageDAO
 import Database.DAO.Questionnaire.QuestionnaireDAO
 import LensesConfig
@@ -18,10 +19,12 @@ import Model.Context.AppContextHelpers
 import Model.Error.Error
 import Model.Package.Package
 import Model.Questionnaire.Questionnaire
-import Service.KnowledgeModel.KnowledgeModelApplicator
-import Service.KnowledgeModel.KnowledgeModelFilter
+import Model.Questionnaire.QuestionnaireState
+import Service.KnowledgeModel.KnowledgeModelService
 import Service.Package.PackageService
 import Service.Questionnaire.QuestionnaireMapper
+import Service.Questionnaire.QuestionnaireValidation
+import Util.Helper
 import Util.Uuid
 
 getQuestionnaires :: AppContextM (Either AppError [QuestionnaireDTO])
@@ -43,8 +46,11 @@ getQuestionnaires =
           eitherQtnWithPkg <- ioEitherQtnWithPkg
           case eitherQtnWithPkg of
             Right (qtn, pkg) -> do
-              let qtnDTO = toDTO qtn pkg
-              return . Right $ acc ++ [qtnDTO]
+              let qtnUuid = U.toString $ qtn ^. uuid
+              let pkgId = pkg ^. pId
+              heGetQuestionnaireState qtnUuid pkgId $ \state -> do
+                let qtnDTO = toDTO qtn pkg state
+                return . Right $ acc ++ [qtnDTO]
             Left error -> return . Left $ error
         Left error -> return . Left $ error
 
@@ -57,7 +63,11 @@ getQuestionnairesForCurrentUser =
         else return . Right $ filter (justOwnersAndPublicQuestionnaires currentUser) questionnaires
   where
     justOwnersAndPublicQuestionnaires currentUser questionnaire =
-      questionnaire ^. private == False || questionnaire ^. ownerUuid == (Just $ currentUser ^. uuid)
+      questionnaire ^. accessibility == PublicQuestionnaire || questionnaire ^. accessibility ==
+      PublicReadOnlyQuestionnaire ||
+      questionnaire ^.
+      ownerUuid ==
+      (Just $ currentUser ^. uuid)
 
 createQuestionnaire :: QuestionnaireCreateDTO -> AppContextM (Either AppError QuestionnaireDTO)
 createQuestionnaire questionnaireCreateDto = do
@@ -68,48 +78,103 @@ createQuestionnaireWithGivenUuid :: U.UUID -> QuestionnaireCreateDTO -> AppConte
 createQuestionnaireWithGivenUuid qtnUuid reqDto =
   heGetCurrentUser $ \currentUser ->
     heFindPackageWithEventsById (reqDto ^. packageId) $ \package ->
-      heGetAllPreviousEventsSincePackageId (reqDto ^. packageId) $ \events ->
-        heCreateKnowledgeModel events $ \knowledgeModel -> do
-          let filteredKm = filterKnowledgeModel (reqDto ^. tagUuids) knowledgeModel
-          now <- liftIO getCurrentTime
-          let qtn = fromQuestionnaireCreateDTO reqDto qtnUuid filteredKm (currentUser ^. uuid) now now
-          insertQuestionnaire qtn
-          return . Right $ toSimpleDTO qtn package
+      heGetQuestionnaireState (U.toString qtnUuid) (reqDto ^. packageId) $ \qtnState -> do
+        now <- liftIO getCurrentTime
+        accessibility <- extractAccessibility reqDto
+        let qtn = fromQuestionnaireCreateDTO reqDto qtnUuid accessibility (currentUser ^. uuid) now now
+        insertQuestionnaire qtn
+        return . Right $ toSimpleDTO qtn package qtnState
 
 getQuestionnaireById :: String -> AppContextM (Either AppError QuestionnaireDTO)
 getQuestionnaireById qtnUuid =
   heFindQuestionnaireById qtnUuid $ \qtn ->
-    checkPermissionToQtn qtn $ heFindPackageById (qtn ^. packageId) $ \package -> return . Right $ toDTO qtn package
+    heCheckPermissionToQtn qtn $ heFindPackageById (qtn ^. packageId) $ \package ->
+      heGetQuestionnaireState qtnUuid (package ^. pId) $ \state -> return . Right $ toDTO qtn package state
 
 getQuestionnaireDetailById :: String -> AppContextM (Either AppError QuestionnaireDetailDTO)
 getQuestionnaireDetailById qtnUuid =
   heFindQuestionnaireById qtnUuid $ \qtn ->
-    checkPermissionToQtn qtn $ do
+    heCheckPermissionToQtn qtn $ do
       heFindPackageWithEventsById (qtn ^. packageId) $ \package ->
-        return . Right $ toDetailWithPackageWithEventsDTO qtn package
+        heCompileKnowledgeModel [] (Just $ qtn ^. packageId) (qtn ^. selectedTagUuids) $ \knowledgeModel ->
+          heGetQuestionnaireState qtnUuid (package ^. pId) $ \state ->
+            return . Right $ toDetailWithPackageWithEventsDTO qtn package knowledgeModel state
 
 modifyQuestionnaire :: String -> QuestionnaireChangeDTO -> AppContextM (Either AppError QuestionnaireDetailDTO)
 modifyQuestionnaire qtnUuid reqDto =
-  heGetQuestionnaireDetailById qtnUuid $ \qtnDto -> do
-    now <- liftIO getCurrentTime
-    let updatedQtn = fromChangeDTO qtnDto reqDto now
-    updateQuestionnaireById updatedQtn
-    return . Right $ toDetailWithPackageDTO updatedQtn (qtnDto ^. package)
+  heGetQuestionnaireDetailById qtnUuid $ \qtnDto ->
+    heCheckEditPermissionToQtn qtnDto $ heGetCurrentUser $ \currentUser -> do
+      now <- liftIO getCurrentTime
+      accessibility <- extractAccessibility reqDto
+      let updatedQtn = fromChangeDTO qtnDto reqDto accessibility (currentUser ^. uuid) now
+      let pkgId = qtnDto ^. package ^. pId
+      updateQuestionnaireById updatedQtn
+      heCompileKnowledgeModel [] (Just pkgId) (updatedQtn ^. selectedTagUuids) $ \knowledgeModel ->
+        heGetQuestionnaireState qtnUuid pkgId $ \state ->
+          return . Right $ toDetailWithPackageDTO updatedQtn (qtnDto ^. package) knowledgeModel state
 
 deleteQuestionnaire :: String -> AppContextM (Maybe AppError)
 deleteQuestionnaire qtnUuid =
-  hmGetQuestionnaireById qtnUuid $ \questionnaire -> do
-    deleteQuestionnaireById qtnUuid
-    return Nothing
+  hmGetQuestionnaireById qtnUuid $ \qtn ->
+    hmValidateQuestionnaireDeletation qtnUuid $ hmCheckEditPermissionToQtn qtn $ do
+      deleteQuestionnaireById qtnUuid
+      deleteMigratorStateByNewQuestionnaireId qtnUuid
+      return Nothing
 
 -- --------------------------------
 -- PRIVATE
 -- --------------------------------
-checkPermissionToQtn qtn callback =
+extractAccessibility dto = do
+  dswConfig <- asks _appContextAppConfig
+  if dswConfig ^. general . questionnaireAccessibilityEnabled
+    then return (dto ^. accessibility)
+    else return PrivateQuestionnaire
+
+heCheckPermissionToQtn qtn callback =
   heGetCurrentUser $ \currentUser ->
-    if currentUser ^. role == "ADMIN" || qtn ^. private == False || qtn ^. ownerUuid == (Just $ currentUser ^. uuid)
+    if currentUser ^. role == "ADMIN" || qtn ^. accessibility == PublicQuestionnaire || qtn ^. accessibility ==
+       PublicReadOnlyQuestionnaire ||
+       qtn ^.
+       ownerUuid ==
+       (Just $ currentUser ^. uuid)
       then callback
-      else return . Left . NotExistsError $ _ERROR_DATABASE__ENTITY_NOT_FOUND
+      else return . Left . ForbiddenError $ _ERROR_VALIDATION__FORBIDDEN "Get Questionnaire"
+
+-- -----------------------------------------------------
+heCheckEditPermissionToQtn qtn callback =
+  heGetCurrentUser $ \currentUser ->
+    if currentUser ^. role == "ADMIN" || qtn ^. accessibility == PublicQuestionnaire || qtn ^. ownerUuid ==
+       (Just $ currentUser ^. uuid)
+      then callback
+      else return . Left . ForbiddenError $ _ERROR_VALIDATION__FORBIDDEN "Edit Questionnaire"
+
+hmCheckEditPermissionToQtn qtn callback =
+  hmGetCurrentUser $ \currentUser ->
+    if currentUser ^. role == "ADMIN" || qtn ^. accessibility == PublicQuestionnaire || qtn ^. ownerUuid ==
+       (Just $ currentUser ^. uuid)
+      then callback
+      else return . Just . ForbiddenError $ _ERROR_VALIDATION__FORBIDDEN "Edit Questionnaire"
+
+-- -----------------------------------------------------
+heCheckMigrationPermissionToQtn qtn callback =
+  heGetCurrentUser $ \currentUser ->
+    if currentUser ^. role == "ADMIN" || qtn ^. accessibility == PublicQuestionnaire || qtn ^. ownerUuid ==
+       (Just $ currentUser ^. uuid)
+      then callback
+      else return . Left . ForbiddenError $ _ERROR_VALIDATION__FORBIDDEN "Migrate Questionnaire"
+
+-- -----------------------------------------------------
+getQuestionnaireState :: String -> String -> AppContextM (Either AppError QuestionnaireState)
+getQuestionnaireState qtnUuid pkgId = do
+  eMigrationState <- findMigratorStateByNewQuestionnaireId qtnUuid
+  case eMigrationState of
+    Right _ -> return . Right $ QSMigrating
+    Left (NotExistsError _) ->
+      heGetNewerPackages pkgId $ \pkgs ->
+        if Prelude.length pkgs == 0
+          then return . Right $ QSDefault
+          else return . Right $ QSOutdated
+    Left error -> return . Left $ error
 
 -- --------------------------------
 -- HELPERS
@@ -121,6 +186,12 @@ heGetQuestionnaires callback = do
     Left error -> return . Left $ error
 
 -- -----------------------------------------------------
+heGetQuestionnaireById qtnUuid callback = do
+  eitherQuestionnaire <- getQuestionnaireById qtnUuid
+  case eitherQuestionnaire of
+    Right questionnaire -> callback questionnaire
+    Left error -> return . Left $ error
+
 hmGetQuestionnaireById qtnUuid callback = do
   eitherQuestionnaire <- getQuestionnaireById qtnUuid
   case eitherQuestionnaire of
@@ -133,3 +204,13 @@ heGetQuestionnaireDetailById qtnUuid callback = do
   case eitherQuestionnaire of
     Right questionnaire -> callback questionnaire
     Left error -> return . Left $ error
+
+-- -----------------------------------------------------
+hmDeleteQuestionnaire qtnUuid callback = do
+  mError <- deleteQuestionnaire qtnUuid
+  case mError of
+    Nothing -> callback
+    Just error -> return . Just $ error
+
+-- -----------------------------------------------------
+heGetQuestionnaireState qtnUuid pkgId = createHeeHelper (getQuestionnaireState qtnUuid pkgId)

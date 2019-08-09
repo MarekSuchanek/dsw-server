@@ -1,7 +1,9 @@
 module Api.Resource.Package.PackageDTO where
 
-import Control.Monad
-import Data.Aeson
+import Data.Time
+import GHC.Generics
+
+import Api.Resource.Event.EventDTO
 
 data PackageDTO = PackageDTO
   { _packageDTOPId :: String
@@ -11,31 +13,11 @@ data PackageDTO = PackageDTO
   , _packageDTOVersion :: String
   , _packageDTOMetamodelVersion :: Int
   , _packageDTODescription :: String
-  , _packageDTOParentPackageId :: Maybe String
-  } deriving (Show, Eq)
-
-instance ToJSON PackageDTO where
-  toJSON PackageDTO {..} =
-    object
-      [ "id" .= _packageDTOPId
-      , "name" .= _packageDTOName
-      , "organizationId" .= _packageDTOOrganizationId
-      , "kmId" .= _packageDTOKmId
-      , "version" .= _packageDTOVersion
-      , "metamodelVersion" .= _packageDTOMetamodelVersion
-      , "description" .= _packageDTODescription
-      , "parentPackageId" .= _packageDTOParentPackageId
-      ]
-
-instance FromJSON PackageDTO where
-  parseJSON (Object o) = do
-    _packageDTOPId <- o .: "id"
-    _packageDTOName <- o .: "name"
-    _packageDTOOrganizationId <- o .: "organizationId"
-    _packageDTOKmId <- o .: "kmId"
-    _packageDTOVersion <- o .: "version"
-    _packageDTOMetamodelVersion <- o .: "metamodelVersion"
-    _packageDTODescription <- o .: "description"
-    _packageDTOParentPackageId <- o .: "parentPackageId"
-    return PackageDTO {..}
-  parseJSON _ = mzero
+  , _packageDTOReadme :: String
+  , _packageDTOLicense :: String
+  , _packageDTOPreviousPackageId :: Maybe String
+  , _packageDTOForkOfPackageId :: Maybe String
+  , _packageDTOMergeCheckpointPackageId :: Maybe String
+  , _packageDTOEvents :: [EventDTO]
+  , _packageDTOCreatedAt :: UTCTime
+  } deriving (Show, Eq, Generic)

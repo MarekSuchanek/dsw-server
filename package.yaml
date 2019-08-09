@@ -1,23 +1,23 @@
 name: dsw-server
-version: '1.4.0'
+version: '1.9.1'
 synopsis: DSW Server
 description: DSW Server
 category: Web
 author: Vojtech Knaisl <vknaisl@gmail.com>
 maintainer: Vojtech Knaisl <vknaisl@gmail.com>
-copyright: 2018 Vojtech Knaisl <vknaisl@gmail.com>
+copyright: 2019 Vojtech Knaisl <vknaisl@gmail.com>
 license: Apache
 license-file: LICENSE.md
-homepage: https://github.com/DataStewardshipWizard/dsw-server
-git: git@github.com:DataStewardshipWizard/dsw-server.git
-bug-reports: https://github.com/DataStewardshipWizard/dsw-common/issues
+homepage: https://github.com/ds-wizard/dsw-server
+git: git@github.com:ds-wizard/dsw-server.git
+bug-reports: https://github.com/ds-wizard/ds-wizard/issues
 tested-with: GHC==8.6.*
 data-files:
-  - config/app-config.cfg
-  - config/build-info.cfg
+  - config/application.yml
+  - config/build-info.yml
   - templates/dmp/root.css
   - templates/dmp/root.html.j2
-  - templates/mail/_common/attachments/logo.png
+  - templates/mail/_common/images/logo.png
   - templates/mail/_common/footer.txt.j2
   - templates/mail/_common/layout.html.j2
   - templates/mail/_common/style.css
@@ -39,14 +39,15 @@ library:
   - base
   - aeson
   - amqp
+  - blaze-html
   - bson
   - bson-generic
   - bytestring
   - case-insensitive
-  - ConfigFile
   - containers
   - data-default
   - directory
+  - dsw-metamodel-migrator
   - exceptions
   - filepath
   - fromhtml
@@ -56,9 +57,12 @@ library:
   - HaskellNet
   - HaskellNet-SSL
   - http-client
+  - http-client-tls
   - http-types
   - jwt
   - lens
+  - lens-aeson
+  - markdown
   - mime-mail
   - mime-types
   - MissingH
@@ -79,17 +83,20 @@ library:
   - retry
   - roman-numerals
   - scotty
-  - smtp-mail
   - text
+  - text-replace
   - time
   - transformers
   - unordered-containers
+  - uri-encode
   - uuid
   - vector
   - wai
   - wai-extra
   - wai-cors
   - warp
+  - wreq
+  - yaml
   default-extensions:
     - TemplateHaskell
     - QuasiQuotes
@@ -108,6 +115,7 @@ library:
     - TypeSynonymInstances
     - FlexibleInstances
     - ScopedTypeVariables
+    - RankNTypes
 
 executables:
   dsw-server:
@@ -140,10 +148,10 @@ tests:
     - bson-generic
     - bytestring
     - case-insensitive
-    - ConfigFile
     - containers
     - data-default
     - ginger
+    - http-client
     - http-types
     - lens
     - jwt
@@ -164,12 +172,14 @@ tests:
     - text
     - time
     - transformers
+    - unordered-containers
     - uuid
     - vector
     - wai
     - wai-extra
     - wai-cors
     - warp
+    - yaml
     - dsw-server
     - hspec
     - hspec-expectations-pretty-diff
